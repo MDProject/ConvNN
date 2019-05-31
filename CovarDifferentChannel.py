@@ -6,7 +6,14 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 import torch.optim as optim
 import os.path as IO
+import numpy as np
+import matplotlib.pyplot as plt
 
+conv1 = []
+conv2 = []
+conv3 = []
+conv4 = []
+conv5 = []
 class Net(nn.Module):
 
     def __init__(self):
@@ -29,7 +36,7 @@ class Net(nn.Module):
         x = F.relu(self.conv3(x))
         #conv3.append(x)
         x = F.relu(self.conv4(x))
-        #conv4.append(x) 
+        conv4.append(x) 
         x = x.view(-1, self.num_flat_features(x))
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
@@ -42,27 +49,11 @@ class Net(nn.Module):
             num_features *= s
         return num_features
 
-net = Net()
-for layer in list(net._modules.items()):
-    print(layer[1])
-
-"""
-def for_hook(module, input, output):
-    print(module)
-    for val in input:
-        print("input val:",val.size())
-    for out_val in output:
-        print("output val:", out_val.size())
-"""
-# net.conv2.register_forward_hook(for_hook)
-# net.conv3.register_forward_hook(for_hook)
 batchSize = 50
 trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
 # print(IO.exists('../MNIST_DATA/train-labels-idx1-ubyte'))
 train_set = dset.MNIST('../MNIST_DATA/', train=True, transform=trans, download=True)
 test_set = dset.MNIST('../MNIST_DATA/', train=False, transform=trans, download=True)
-# img, label = train_set[0]
-
 train_loader = torch.utils.data.DataLoader(dataset=train_set, 
                                            batch_size=batchSize, 
                                            shuffle=True)
@@ -70,40 +61,49 @@ train_loader = torch.utils.data.DataLoader(dataset=train_set,
 test_loader = torch.utils.data.DataLoader(dataset=test_set, 
                                           batch_size=batchSize, 
                                           shuffle=False)
-
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(net.parameters(),lr=1e-3)
-savePath = './Project/param'
+# print(net)
+loadPath = './Project/param'
 appendix = '.t7'
-#   print(IO.exists(savePath))
-loss_bound = 0.01
-def train(epoch): # epoch -- ensemble number
-    for i in range(epoch):
-        for batch_idx, (data, target) in enumerate(train_loader):
-        #   target = target.float()
-            data, target = Variable(data), Variable(target)
-            optimizer.zero_grad()
-            output = net(data)
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
-            if loss.item() < loss_bound:
-                print("Epoch {0}:  Batch idx: {1}  Loss: {2} -- IO".format(i,batch_idx,loss.item()))
-                break
-            if batch_idx % 500 == 0:
-                print("Epoch {0}:  Batch idx: {1}  Loss: {2}".format(i,batch_idx,loss.item()))
-        path = savePath + str(i) + appendix
-        torch.save(net.state_dict(),path)
+# print(IO.exists(loadPath))
 
-Ensemble_num = 50
-train(2)
-net.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
-with torch.no_grad():
-    correct = 0
-    total = 0
-    for images, labels in test_loader:
-        outputs = net(images)
-        _, predicted = torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
-    print('Test Accuracy of the model on the 10000 test images: {} %'.format(100 * correct / total))
+Ensemble_num = 10 # Smaller than batchSize ( number of samples used in each batch )
+
+# <hihj> of different channels
+n = 1   # w index
+net = Net()
+path = loadPath + str(n) + appendix
+model_dict=net.load_state_dict(torch.load(path))
+for images, labels in test_loader:
+    outputs = net(images)
+print(len(conv4))
+
+h_act4 = []
+for cindex in range(conv4[0][0].size(0)):
+    h_act4_array = torch.zeros(len(conv4)*Ensemble_num,12*12)
+    for i in range(len(conv4)):
+        for j in range(Ensemble_num): # channel idx = 1
+            h_act4_array[i*Ensemble_num+j,:] = conv4[i][j,cindex].reshape(1,12*12)
+    h_act4.append(h_act4_array)
+idx_i = [0,1,2,3,4,5,6,7,8,9,1,1,1,1,1,2,2,2,5,5,5,8,8,8]
+idx_j = [0,1,2,3,4,5,6,7,8,9,2,3,5,7,9,4,6,8,1,3,9,1,5,7]
+root = './Project/OffDiag/'
+for i in range(len(idx_i)):
+    h_act_i = h_act4[idx_i[i]]
+    h_act_j = h_act4[idx_j[i]]
+    h_act_i_T = torch.transpose(h_act_i,0,1)
+    CMatrix = torch.mm(h_act_i_T,h_act_j)/h_act_i.size(0)
+    h_act_i_mean = torch.mean(h_act_i,0)
+    h_act_j_mean = torch.mean(h_act_j,0)
+    h_act_i_mean = h_act_i_mean.view(1,h_act_i_mean.size(0))
+    h_act_j_mean = h_act_j_mean.view(1,h_act_j_mean.size(0))
+    CMatrix_ = torch.mm(torch.transpose(h_act_i_mean,0,1),h_act_j_mean)
+    C = (CMatrix - CMatrix_).detach().numpy()
+    fname = root + 'layer4_' + str(idx_i[i]) + '_' + str(idx_j[i]) + '.jpg'
+    plt.figure()
+    plt.imshow(C)  
+    plt.colorbar()
+    plt.savefig(fname) 
+
+
+
+

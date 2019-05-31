@@ -36,7 +36,7 @@ class Net(nn.Module):
         x = F.relu(self.conv3(x))
         #conv3.append(x)
         x = F.relu(self.conv4(x))
-        conv4.append(x) 
+        #conv4.append(x) 
         x = x.view(-1, self.num_flat_features(x))
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
@@ -148,6 +148,7 @@ for cindex in range(conv3[0][0].size(0)):
     D3[cindex] = np.square(torch.trace(CovMatrix3).detach().numpy())/torch.trace(torch.mm(CovMatrix3,CovMatrix3)).detach().numpy()       
 print(D3)
 """
+"""
 D4 = np.zeros(conv4[0][0].size(0))
 for cindex in range(conv4[0][0].size(0)):
     for i in range(len(conv4)):
@@ -161,9 +162,9 @@ for cindex in range(conv4[0][0].size(0)):
     CovMatrix4 = CMat4 - CMat4_
     D4[cindex] = np.square(torch.trace(CovMatrix4).detach().numpy())/torch.trace(torch.mm(CovMatrix4,CovMatrix4)).detach().numpy()
 print(D4)
+"""
 print("PAUSE")
 
-"""
 n = 1   # w index
 net = Net()
 print(net)
@@ -197,6 +198,8 @@ def statisticOfWeight(array_w,min,max,intervals):
 Min = -0.4
 Max = 0.4
 root = './Project/weight/'
+"""
+# weight distribution of each channel and layer
 for l in range(4):
     weight_tensor = weightReplica[l]
     numOfChannel = weight_tensor.size(0)
@@ -207,5 +210,24 @@ for l in range(4):
         plt.figure()
         plt.plot(seg, freq, '-o')
         plt.savefig(fname)
-print('weight distribution saved')
 """
+# weight distribution of each conv*
+Wt = []
+for l in range(4):
+    weight_tensor = weightReplica[l]
+    weight_tensor = weight_tensor.view(1,-1)
+    Wt.append(weight_tensor[0])
+    fname = root + 'Layer' + str(l) + '.jpg' 
+    freq,seg = statisticOfWeight(weight_tensor[0],Min,Max,40)
+    plt.figure()
+    plt.plot(seg, freq, '-o')
+    plt.savefig(fname)
+Wt = torch.cat((Wt[0],Wt[1],Wt[2],Wt[3]),0)
+
+# weight distribution of all conv
+fname = root + 'AllLayer' + '.jpg' 
+freq,seg = statisticOfWeight(Wt,Min,Max,40)
+plt.figure()
+plt.plot(seg, freq, '-o')
+plt.savefig(fname)
+print('weight distribution saved')

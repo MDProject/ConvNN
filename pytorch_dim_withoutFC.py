@@ -18,8 +18,7 @@ class Net(nn.Module):
         self.conv3 = nn.Conv2d(10, 20, 5)
         self.conv4 = nn.Conv2d(20, 10, 5)
         # an affine operation: y = Wx + b
-        self.fc1 = nn.Linear(10 * 12 * 12, 64)
-        self.fc2 = nn.Linear(64, 10)
+        self.fc1 = nn.Linear(10 * 12 * 12, 10)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -31,8 +30,7 @@ class Net(nn.Module):
         x = F.relu(self.conv4(x))
         #conv4.append(x) 
         x = x.view(-1, self.num_flat_features(x))
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
+        x = self.fc1(x)
         return x
 
     def num_flat_features(self, x):
@@ -73,8 +71,6 @@ test_loader = torch.utils.data.DataLoader(dataset=test_set,
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(net.parameters(),lr=1e-3)
-savePath = './Project/param'
-appendix = '.t7'
 #   print(IO.exists(savePath))
 loss_bound = 0.01
 def train(epoch): # epoch -- ensemble number
@@ -92,12 +88,7 @@ def train(epoch): # epoch -- ensemble number
                 break
             if batch_idx % 500 == 0:
                 print("Epoch {0}:  Batch idx: {1}  Loss: {2}".format(i,batch_idx,loss.item()))
-        path = savePath + str(i) + appendix
-        torch.save(net.state_dict(),path)
-
-Ensemble_num = 50
-train(2)
-net.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
+train(1)
 with torch.no_grad():
     correct = 0
     total = 0

@@ -6,30 +6,33 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 import torch.optim as optim
 import os.path as IO
+import numpy as np
 
+conv1 = []
+conv2 = []
+conv3 = []
+FC = []
 class Net(nn.Module):
 
     def __init__(self):
         super(Net, self).__init__()
         # 1 input image channel, 6 output channels, 5x5 square convolution
         # kernel
-        self.conv1 = nn.Conv2d(1, 5, 5)
-        self.conv2 = nn.Conv2d(5, 10, 5)
-        self.conv3 = nn.Conv2d(10, 20, 5)
-        self.conv4 = nn.Conv2d(20, 10, 5)
+        self.conv1 = nn.Conv2d(1, 5, 5) # 28*28 -- 24*24 + pooling 24*24 -- 12*12
+        self.conv2 = nn.Conv2d(5, 10, 5) # 12*12 -- 8*8
+        self.conv3 = nn.Conv2d(10, 20, 5) # 8*8 -- 4*4
         # an affine operation: y = Wx + b
-        self.fc1 = nn.Linear(10 * 12 * 12, 64)
+        self.fc1 = nn.Linear(20 * 4 * 4, 64)
         self.fc2 = nn.Linear(64, 10)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        #conv1.append(x)
+        tmp = F.relu(self.conv1(x))
+        x = F.avg_pool2d(tmp,(2,2))
+        #conv1.append(tmp)
         x = F.relu(self.conv2(x))
         #conv2.append(x)
         x = F.relu(self.conv3(x))
         #conv3.append(x)
-        x = F.relu(self.conv4(x))
-        #conv4.append(x) 
         x = x.view(-1, self.num_flat_features(x))
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
@@ -73,7 +76,7 @@ test_loader = torch.utils.data.DataLoader(dataset=test_set,
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(net.parameters(),lr=1e-3)
-savePath = './Project/param'
+savePath = './Project/Pool/param'
 appendix = '.t7'
 #   print(IO.exists(savePath))
 loss_bound = 0.01
@@ -94,9 +97,8 @@ def train(epoch): # epoch -- ensemble number
                 print("Epoch {0}:  Batch idx: {1}  Loss: {2}".format(i,batch_idx,loss.item()))
         path = savePath + str(i) + appendix
         torch.save(net.state_dict(),path)
-
-Ensemble_num = 50
-train(2)
+Ensemble_num = 10
+train(1)
 net.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
 with torch.no_grad():
     correct = 0
@@ -107,3 +109,4 @@ with torch.no_grad():
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
     print('Test Accuracy of the model on the 10000 test images: {} %'.format(100 * correct / total))
+
